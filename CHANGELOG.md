@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+_No unreleased changes._
+
+---
+
+## [2.19.3] - 2026-04-25
+
 ### 📋 v2.19.3 Patch Release
 
 This is a patch release for the v2.19 series focused on upgrade-safe reliability fixes.
@@ -26,6 +32,14 @@ This is a patch release for the v2.19 series focused on upgrade-safe reliability
 
 ---
 
+## [2.19.2] - 2026-02-17
+
+_See [GitHub release v2.19.2](https://github.com/mysticaltech/terraform-hcloud-kube-hetzner/releases/tag/v2.19.2)._
+
+---
+
+## [2.19.1] - 2026-02-02
+
 ### 📋 v2.19.1 Patch Release
 
 This is a patch release for v2.19.0. **If upgrading from v2.18.x**, please review the full release notes below including upgrade notes, new features, and breaking changes.
@@ -34,6 +48,8 @@ This is a patch release for v2.19.0. **If upgrading from v2.18.x**, please revie
 - **Audit Policy Bastion Connection** - Fixed missing bastion SSH settings in `audit_policy` provisioner, enabling audit policy deployment for NAT router / private network setups (#2042) - thanks @CounterClops
 
 ---
+
+## [2.19.0] - 2026-02-01
 
 ### ⚠️ Upgrade Notes (from v2.18.x)
 
@@ -103,12 +119,6 @@ If you created a NAT router **before v2.19.0** (when the hcloud provider used th
 - **terraform_data Migration** - Migrated from null_resource to terraform_data with automatic state migration (#1548)
 - **remote-exec Refactor** - Improved provisioner compatibility with Terraform Stacks (#1893)
 - **Custom GPT Updated** - [KH Assistant](https://chatgpt.com/g/g-67df95cd1e0c8191baedfa3179061581-kh-assistant) updated with v2.19.0 features, improved knowledge base, and cost calculator
-
----
-
-## [2.19.0] - 2026-02-01
-
-_Initial release of the v2.19 series. See above for full feature list._
 
 ---
 

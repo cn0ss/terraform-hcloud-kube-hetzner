@@ -50,6 +50,8 @@ Therefore:
 - Do not move `[Unreleased]` to `[vX.Y.Z] - YYYY-MM-DD` before tagging unless you are also bypassing the workflow and manually providing release notes.
 - Do not run `gh release create` during the normal path; the tag workflow owns release creation. Use `gh release create` only as a recovery path if the workflow fails.
 - If Karim asks for a tiny release-prep correction during release, commit and push it directly to `master`, then tag the resulting commit.
+- After a successful release, cut `CHANGELOG.md`: reset `## [Unreleased]` to an empty placeholder and move the released notes under `## [X.Y.Z] - YYYY-MM-DD`. Commit and push that cleanup directly to `master`.
+- Previous release notes must never remain under `## [Unreleased]`; otherwise the next tag workflow will publish stale notes again.
 
 ## Workflow
 
@@ -305,6 +307,30 @@ gh release list --repo "$REPO" --limit 3
 git ls-remote --tags origin "refs/tags/$VERSION"
 ```
 
+Inspect the live release notes, not just the workflow status:
+
+```bash
+gh release view "$VERSION" --repo "$REPO" --json body --jq .body
+```
+
+If the body contains stale content from older releases, edit the GitHub release directly with a corrected body and then fix `CHANGELOG.md` on `master` so the same mistake does not recur.
+
+After confirming the live release, cut the changelog:
+
+```markdown
+## [Unreleased]
+
+_No unreleased changes._
+
+---
+
+## [X.Y.Z] - YYYY-MM-DD
+
+...released notes...
+```
+
+Commit and push the changelog cut directly to `master`.
+
 ## Version Reference Locations
 
 Files that may need version updates:
@@ -329,3 +355,5 @@ Files that may need version updates:
 - [ ] If explicitly authorized, tag pushed
 - [ ] Release workflow succeeded
 - [ ] GitHub release exists and points at the intended commit
+- [ ] Live GitHub release body contains only content relevant to this release
+- [ ] `CHANGELOG.md` is cut after release, with a clean `[Unreleased]` section
