@@ -144,7 +144,8 @@ resource "hcloud_server" "nat_router" {
 
   lifecycle {
     # Keepalived manages alias IPs during failover.
-    ignore_changes = [network]
+    # Cloud-init is creation-only; upgrade fixes for existing routers must run through terraform_data provisioners.
+    ignore_changes = [network, user_data]
   }
 
 }
@@ -188,7 +189,7 @@ resource "terraform_data" "nat_router_fail2ban" {
 
   triggers_replace = {
     server_id  = hcloud_server.nat_router[count.index].id
-    config_sha = sha256("fail2ban-systemd-ssh-service-v1")
+    config_sha = sha256("fail2ban-systemd-ssh-service-v3")
   }
 
   connection {
@@ -221,7 +222,7 @@ resource "terraform_data" "nat_router_fail2ban" {
       as_root tee /etc/fail2ban/jail.d/sshd.local >/dev/null <<'EOF'
       [sshd]
       enabled = true
-      port = ssh
+      port = ${var.ssh_port}
       backend = systemd
       journalmatch = _SYSTEMD_UNIT=ssh.service + _COMM=sshd
       maxretry = 5
