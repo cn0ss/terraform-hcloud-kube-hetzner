@@ -14,6 +14,37 @@ locals {
 
   nat_router_name_basename = "nat-router"
   nat_router_name          = "${var.use_cluster_name_in_node_name ? "${var.cluster_name}-" : ""}${local.nat_router_name_basename}"
+
+  nat_router_fail2ban_script = <<-EOT
+set -e
+
+as_root() {
+  if [ "$(id -u)" -eq 0 ]; then
+    "$@"
+  else
+    sudo "$@"
+  fi
+}
+
+if ! dpkg -s fail2ban python3-systemd >/dev/null 2>&1; then
+  as_root apt-get update
+  as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y fail2ban python3-systemd
+fi
+
+as_root mkdir -p /etc/fail2ban/jail.d
+as_root tee /etc/fail2ban/jail.d/sshd.local >/dev/null <<'EOF'
+[sshd]
+enabled = true
+port = ${var.ssh_port}
+backend = systemd
+journalmatch = _SYSTEMD_UNIT=ssh.service + _COMM=sshd
+maxretry = 5
+bantime = 86400
+EOF
+
+as_root systemctl enable --now fail2ban
+as_root systemctl restart fail2ban
+EOT
 }
 
 resource "random_string" "nat_router" {
@@ -189,7 +220,7 @@ resource "terraform_data" "nat_router_fail2ban" {
 
   triggers_replace = {
     server_id  = hcloud_server.nat_router[count.index].id
-    config_sha = sha256("fail2ban-systemd-ssh-service-v3")
+    config_sha = sha256(local.nat_router_fail2ban_script)
   }
 
   connection {
@@ -202,36 +233,7 @@ resource "terraform_data" "nat_router_fail2ban" {
 
   provisioner "remote-exec" {
     inline = [
-      <<-EOT
-      set -e
-
-      as_root() {
-        if [ "$(id -u)" -eq 0 ]; then
-          "$@"
-        else
-          sudo "$@"
-        fi
-      }
-
-      if ! dpkg -s fail2ban python3-systemd >/dev/null 2>&1; then
-        as_root apt-get update
-        as_root env DEBIAN_FRONTEND=noninteractive apt-get install -y fail2ban python3-systemd
-      fi
-
-      as_root mkdir -p /etc/fail2ban/jail.d
-      as_root tee /etc/fail2ban/jail.d/sshd.local >/dev/null <<'EOF'
-      [sshd]
-      enabled = true
-      port = ${var.ssh_port}
-      backend = systemd
-      journalmatch = _SYSTEMD_UNIT=ssh.service + _COMM=sshd
-      maxretry = 5
-      bantime = 86400
-      EOF
-
-      as_root systemctl enable --now fail2ban
-      as_root systemctl restart fail2ban
-      EOT
+      local.nat_router_fail2ban_script,
     ]
   }
 }
