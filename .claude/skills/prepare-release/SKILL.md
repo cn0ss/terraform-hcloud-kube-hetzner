@@ -315,6 +315,8 @@ gh release view "$VERSION" --repo "$REPO" --json body --jq .body
 
 If the body contains stale content from older releases, edit the GitHub release directly with a corrected body and then fix `CHANGELOG.md` on `master` so the same mistake does not recur.
 
+If creating or updating a pinned upgrade notice issue after release, write it for the full practical upgrade path users need, not just the latest patch delta. For example, after a `v2.19.x` patch, the pinned notice should cover upgrading from `v2.18.x` to the current `v2.19.x`, including older release caveats such as state migration instructions, version requirements, and plan-review warnings.
+
 After confirming the live release, cut the changelog:
 
 ```markdown
@@ -356,4 +358,5 @@ Files that may need version updates:
 - [ ] Release workflow succeeded
 - [ ] GitHub release exists and points at the intended commit
 - [ ] Live GitHub release body contains only content relevant to this release
+- [ ] Pinned upgrade notice, if used, covers the previous-series-to-current upgrade path
 - [ ] `CHANGELOG.md` is cut after release, with a clean `[Unreleased]` section
