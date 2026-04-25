@@ -199,19 +199,60 @@ resource "terraform_data" "configure_longhorn_volume" {
 
   triggers_replace = {
     agent_id             = module.agents[each.key].id
+    longhorn_fstype      = var.longhorn_fstype
+    longhorn_mount_path  = each.value.longhorn_mount_path
     longhorn_volume_size = hcloud_volume.longhorn_volume[each.key].size
+    volume_id            = hcloud_volume.longhorn_volume[each.key].id
   }
 
   # Configure and resize the longhorn volume
   provisioner "remote-exec" {
     inline = [
-      "set -e",
-      "mkdir -p '${each.value.longhorn_mount_path}' >/dev/null",
-      "mountpoint -q '${each.value.longhorn_mount_path}' || mount -o discard,defaults ${hcloud_volume.longhorn_volume[each.key].linux_device} '${each.value.longhorn_mount_path}'",
-      "${var.longhorn_fstype == "ext4" ? "resize2fs" : "xfs_growfs"} ${hcloud_volume.longhorn_volume[each.key].linux_device}",
-      # Match any non-comment line (^[^#]) with any first field, followed by a space and your mount path in the second column.
-      # This prevents false positives like /data matching /data1.
-      "awk -v path='${each.value.longhorn_mount_path}' '$0 !~ /^#/ && $2 == path { found=1; exit } END { exit !found }' /etc/fstab || echo '${hcloud_volume.longhorn_volume[each.key].linux_device} ${each.value.longhorn_mount_path} ${var.longhorn_fstype} discard,nofail,defaults 0 0' | tee -a /etc/fstab >/dev/null"
+      <<-EOT
+      set -e
+
+      device='${hcloud_volume.longhorn_volume[each.key].linux_device}'
+      mount_path='${each.value.longhorn_mount_path}'
+      fstype='${var.longhorn_fstype}'
+
+      mkdir -p "$mount_path" >/dev/null
+      uuid="$(blkid -s UUID -o value "$device")"
+      if [ -z "$uuid" ]; then
+        echo "Unable to determine filesystem UUID for $device" >&2
+        exit 1
+      fi
+
+      {
+        findmnt -rn -S "$device" -o TARGET || true
+        findmnt -rn -S "UUID=$uuid" -o TARGET || true
+      } | sort -u | while read -r current_mount; do
+        if [ -n "$current_mount" ] && [ "$current_mount" != "$mount_path" ]; then
+          umount "$current_mount"
+        fi
+      done
+
+      if mountpoint -q "$mount_path"; then
+        mounted_source="$(findmnt -rn -T "$mount_path" -o SOURCE)"
+        mounted_uuid="$(blkid -s UUID -o value "$mounted_source" 2>/dev/null || true)"
+        if [ "$mounted_uuid" != "$uuid" ]; then
+          umount "$mount_path"
+        fi
+      fi
+
+      mountpoint -q "$mount_path" || mount -o discard,defaults "$device" "$mount_path"
+
+      case "$fstype" in
+        ext4) resize2fs "$device" ;;
+        xfs) xfs_growfs "$mount_path" ;;
+        *) echo "Unsupported Longhorn filesystem type: $fstype" >&2; exit 1 ;;
+      esac
+
+      tmp_fstab="$(mktemp)"
+      awk -v path="$mount_path" -v uuid="$uuid" -v device="$device" '$0 ~ /^#/ || ($1 != "UUID=" uuid && $1 != device && $2 != path) { print }' /etc/fstab > "$tmp_fstab"
+      cat "$tmp_fstab" > /etc/fstab
+      rm -f "$tmp_fstab"
+      printf 'UUID=%s %s %s discard,nofail,defaults 0 0\n' "$uuid" "$mount_path" "$fstype" >> /etc/fstab
+      EOT
     ]
   }
 

@@ -13,10 +13,10 @@ locals {
   # k3s endpoint used for agent registration, respects control_plane_endpoint override
   k3s_endpoint = coalesce(var.control_plane_endpoint, "https://${var.use_control_plane_lb ? hcloud_load_balancer_network.control_plane.*.ip[0] : module.control_planes[keys(module.control_planes)[0]].private_ipv4_address}:6443")
 
-  ccm_version    = var.hetzner_ccm_version != null ? var.hetzner_ccm_version : data.github_release.hetzner_ccm[0].release_tag
-  csi_version    = length(data.github_release.hetzner_csi) == 0 ? var.hetzner_csi_version : data.github_release.hetzner_csi[0].release_tag
-  kured_version  = length(data.github_release.kured) == 0 ? var.kured_version : data.github_release.kured[0].release_tag
-  calico_version = length(data.github_release.calico) == 0 ? var.calico_version : data.github_release.calico[0].release_tag
+  ccm_version    = var.hetzner_ccm_version != null ? var.hetzner_ccm_version : jsondecode(data.http.hetzner_ccm_release[0].response_body).tag_name
+  csi_version    = length(data.http.hetzner_csi_release) == 0 ? var.hetzner_csi_version : jsondecode(data.http.hetzner_csi_release[0].response_body).tag_name
+  kured_version  = length(data.http.kured_release) == 0 ? var.kured_version : jsondecode(data.http.kured_release[0].response_body).tag_name
+  calico_version = length(data.http.calico_release) == 0 ? var.calico_version : jsondecode(data.http.calico_release[0].response_body).tag_name
 
   # Determine kured YAML suffix based on version (>= 1.20.0 uses -combined.yaml, < 1.20.0 uses -dockerhub.yaml)
   kured_yaml_suffix = provider::semvers::compare(local.kured_version, "1.20.0") >= 0 ? "combined" : "dockerhub"
@@ -1357,8 +1357,8 @@ cloudinit_runcmd_common = <<EOT
 - [sed, '-i', 's/^TIMELINE_LIMIT_MONTHLY=".*"/TIMELINE_LIMIT_MONTHLY="0"/', /etc/snapper/configs/root]
 - [sed, '-i', 's/^TIMELINE_LIMIT_YEARLY=".*"/TIMELINE_LIMIT_YEARLY="0"/', /etc/snapper/configs/root]
 
-# Disable timeline snapshots entirely — transactional-update already creates pre/post snapshots
-- [systemctl, disable, '--now', 'snapper-timeline.timer']
+# Disable timeline snapshots entirely; transactional-update already creates pre/post snapshots.
+- [sh, '-c', 'systemctl disable --now snapper-timeline.timer || true']
 
 # Allow network interface
 - [chmod, '+x', '/etc/cloud/rename_interface.sh']
